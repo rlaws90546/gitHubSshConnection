@@ -10,7 +10,7 @@ public class App {
 	public String getGreeting() {
 		return "Hello World, I am a Gradle project...";
 	}
-
+	
     public static void main(String[] args) {
 				
 		String publicKeyPath = "pubkey_path.pem";
@@ -31,4 +31,5 @@ public class App {
 		// Before the end of the main method, close out of SSH service
 		gitService.stopSshService();
 	}
+	*/
 }

@@ -77,9 +77,9 @@ public class GitService {
     public void createSshService() {
     	this.sshService = new SshService();
     }
-    public void createSshService(String privKeyPath, String pubKeyPath) {
+    public void createSshService(String pubKeyPath, String privKeyPath) {
     	try {
-			this.sshService = new SshService(privKeyPath, pubKeyPath);
+			this.sshService = new SshService(pubKeyPath, privKeyPath);
 		} catch (IOException e) {
 			System.err.println("Error creating SSH service with private key path & private key loaded:\n");
 			e.printStackTrace();
