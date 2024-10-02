@@ -7,29 +7,36 @@ import org.example.service.GitService;
 
 public class App {
 	
+	// Test checks for getGreeting method & now I kinda like it here
 	public String getGreeting() {
 		return "Hello World, I am a Gradle project...";
 	}
 	
+	
     public static void main(String[] args) {
-				
+		
+    	// Provide the path to public and private key PEM files (works best if they are put in the "app" directory)
+    	// TODO Change the paths below
 		String publicKeyPath = "pubkey_path.pem";
 		String privateKeyPath = "privkey_path.pem";
 		
 		
-		// Create Git Service object
+		// Create Git Service object with the SSH address to the GitHub repo and the location of the repository on the local machine
 		GitService gitService = new GitService("git@github.com:userName/repoName.git", "/path/to/local/gitDir");
 		
+		// Call method to create SSH connection with public and private keys 
 		gitService.createSshService(publicKeyPath, privateKeyPath);
 		
 		// Pick which method you would like to use from GitService --> cloneRepository() OR addCommitPush()
 		//gitService.cloneRepository();
 		gitService.addCommitPush();
 
+		// Call helper method to delete the configuration file for the SSH directory
+		// TODO do this behind the scenes...
 		gitService.deleteConfigFile();
 		
 		// Before the end of the main method, close out of SSH service
 		gitService.stopSshService();
 	}
-	*/
+
 }

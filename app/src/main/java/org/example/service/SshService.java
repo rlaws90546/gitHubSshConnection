@@ -28,70 +28,54 @@ import org.eclipse.jgit.transport.sshd.SshdSessionFactory;
 import org.eclipse.jgit.transport.sshd.SshdSessionFactoryBuilder;
 import org.eclipse.jgit.util.FS;
 
+/*
+ * Service class to help with establishing a connection to GitHub using SSH
+ */
 public class SshService {
 	
+	// Global variables for necessary SSH components
 	private TransportConfigCallback transportConfigCallback;
 	private SshClient sshClient;
 	private SshdSessionFactory sshdSessionFactory = null;
-	private File configFile;
-	
 	private String privKeyPath;
 	private String pubKeyPath;
 	private KeyPair keyPair;
 	
+	// Global variables for configuration file helps getting around security (not great)
+	private File configFile;
+	
+	// Set default SSH directory to .ssh
 	private final File defaultSshDir = new File(FS.DETECTED.userHome(), "/.ssh");
 	
-	@SuppressWarnings("unused")
-	public SshService() {
-		
-		// Configure the SshClient with default client identity
-        this.sshClient = SshClient.setUpDefaultClient();
-        this.sshClient.setClientIdentityLoader(ClientIdentityLoader.DEFAULT);
-        this.sshClient.start();
-
-        this.sshdSessionFactory = new SshdSessionFactoryBuilder()
-                .setPreferredAuthentications("publickey")
-                .setHomeDirectory(FS.DETECTED.userHome())
-                .setSshDirectory(defaultSshDir)
-                .build(null);
-
-        // Ensure the session factory is not null before using it
-        if (this.sshdSessionFactory == null) {
-            throw new IllegalStateException("SSH session factory is null.");
-        } 
-        
-        // Configure the transport to use the custom SshdSessionFactory
-        this.transportConfigCallback = new TransportConfigCallback() {
-            @Override
-            public void configure(Transport transport) {
-                if (transport instanceof SshTransport) {
-                    ((SshTransport) transport).setSshSessionFactory(sshdSessionFactory);
-                }
-            }
-        };
-	}
-
-	
-	// Constructor for loading public/private key pair
+	// Constructor for loading public/private key pair (really .pem files that contain the keys, also why an IOException is thrown)
 	@SuppressWarnings("unused")
 	public SshService(String publicKeyPath, String privateKeyPath) throws IOException{
 		
-	    // Set up SSH client
+	    // Set up SSH client with default client identity
 	    this.sshClient = SshClient.setUpDefaultClient();
 	    this.sshClient.setClientIdentityLoader(ClientIdentityLoader.DEFAULT);
 	    this.sshClient.start();
 	    
+	    // Set global variables to file paths that were passed from GitService, so they can be used for access and converting to Java objects
 	    this.pubKeyPath = publicKeyPath;
 	    this.privKeyPath = privateKeyPath;
 	    
-	    // NEED TO --> SshdSessionFactoryBuilder.setDefaultKeysProvider(Function<File, Iterable<KeyPair>>);
-        this.sshdSessionFactory = getSshSessionFactory();
+	    // IMPORTANT STUFF here: 
+	    //   --> Used the ".setDefaultKeysProvider(File -> Iterable<KeyPair>)" to pass converted keys to the SshdSession Factory
+	    //       (The Factory Builder still requires you to set the Home and SSH directories, which is why those are still there)
+	    this.sshdSessionFactory sshdSession = new SshdSessionFactoryBuilder()
+                .setPreferredAuthentications("publickey")
+                .setHomeDirectory(FS.DETECTED.userHome())
+                .setSshDirectory(defaultSshDir)
+                .setDefaultKeysProvider(this::createKeyPairSafely)
+                .build(null);
 
 	    // Ensure the session factory is not null before using it
 	    if (this.sshdSessionFactory == null) {
 	    	throw new IllegalStateException("SSH session factory is null.");
 	    }
 
+	    // Create the TransportConfigCallback object that will be used when establishing a connection to GitHub
 	    this.transportConfigCallback = new TransportConfigCallback() {
             @Override
             public void configure(Transport transport) {
@@ -107,20 +91,9 @@ public class SshService {
 		return transportConfigCallback;
 	}
 	
-	public SshdSessionFactory getSshSessionFactory() throws IOException {
-		//Security.addProvider(new BouncyCastleProvider());				
-		createConfigFile(defaultSshDir);
-		
-        SshdSessionFactory sshdSession = new SshdSessionFactoryBuilder()
-                .setPreferredAuthentications("publickey")
-                .setHomeDirectory(FS.DETECTED.userHome())
-                .setSshDirectory(defaultSshDir)
-                .setDefaultKeysProvider(this::createKeyPairSafely)
-                .build(null);
-        
-        return sshdSession;
-	}
-	
+	// Ran into a few issues with unhandled Exceptions when trying to get the lambda/arrow function in the SshdSessionFactory to work properly,
+	//   so I ended up making this try/catch method to do it.
+	// TODO --> make this cleaner...
 	private Iterable<KeyPair> createKeyPairSafely(File f) {
 		Iterable<KeyPair> safePair = null;
 		try {
@@ -131,9 +104,8 @@ public class SshService {
 	    return safePair;
 	}
 	
-	private Iterable<KeyPair> createKeyPair(File f) throws Exception{
-		//System.out.println("Called createKeys method...\n");
-		
+	// The real helper method that returns the required Iterable<KeyPair> object, calls collectKeysFromMemory() to add them to the Iterable
+	private Iterable<KeyPair> createKeyPair(File f) throws Exception{		
 		List<KeyPair> pair = new ArrayList<>();
 		collectKeyFromMemory();
 		pair.add(this.keyPair);
@@ -141,6 +113,7 @@ public class SshService {
 		return pair;
 	}
 	
+	// Helper method that just represents the logic of loading BOTH the Public & PrivateKey objects into the KeyPair object
 	private void collectKeyFromMemory() {
 		try {
 			this.keyPair = new KeyPair(loadPublicKey(this.pubKeyPath), loadPrivateKey(this.privKeyPath));
@@ -149,56 +122,62 @@ public class SshService {
 		}
 	}
 	
+	// Method to take a PEM-formatted private key and convert it into a PrivateKey object
 	public static PrivateKey loadPrivateKey(String filename) throws Exception {
-        // Read the key from the file
+        // Read the private key from the file
         String privateKeyPEM = new String(Files.readAllBytes(Paths.get(filename)));
         
-        // Remove the "BEGIN" and "END" lines and any whitespace from the private key string
+        // Remove "BEGIN", "END", and whitespace from the key string
         privateKeyPEM = privateKeyPEM
             .replace("-----BEGIN PRIVATE KEY-----", "")
             .replace("-----END PRIVATE KEY-----", "")
-            .replaceAll("\\s+", ""); // Remove newlines, spaces, etc.
+            .replaceAll("\\s+", "");
         
-        System.out.println("Formatted PrivKey: \n" + privateKeyPEM.substring(0, 100) + "\n");
+        // Debugging print statement to verify that the private key is copying and being formatted correctly
+        //System.out.println("Formatted PrivKey: \n" + privateKeyPEM.substring(0, 100) + "\n");
         
-        // Decode the Base64 encoded string into a byte array
+        // Decode the Base64-encoded String into a byte array to be passed to key spec
         byte[] privateKeyBytes = Base64.getDecoder().decode(privateKeyPEM);
         
-        // Create a key specification for the private key
+        // Create a key specification for the private key (always PKCS8 from what I could find)
         EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(privateKeyBytes);
 
-        // Create a KeyFactory for the RSA algorithm (or EC for elliptic curve keys)
+        // Create a KeyFactory for the RSA algorithm
+        // TODO figure out what to do for ED25519 keys, because that is currently a bit of a headache
         KeyFactory keyFactory = KeyFactory.getInstance("RSA");
         
-        // Generate the PrivateKey object
+        // Generate & return the PrivateKey object
         return keyFactory.generatePrivate(keySpec);
     }
 	
 	public static PublicKey loadPublicKey(String filename) throws Exception {
+        // Read the public key from the file
 		String publicKeyPEM = new String(Files.readAllBytes(Paths.get(filename)));
-		// Remove the "BEGIN" and "END" lines and any whitespace from the public key string
+		
+		// Remove "BEGIN", "END", and whitespace from the key string
         publicKeyPEM = publicKeyPEM
             .replace("-----BEGIN PUBLIC KEY-----", "")
             .replace("-----END PUBLIC KEY-----", "")
-            .replaceAll("\\s+", ""); // Remove newlines and other whitespace
+            .replaceAll("\\s+", "");
         
+        // Debugging print statement to verify that the private key is copying and being formatted correctly
         System.out.println("Formatted PubKey: \n" + publicKeyPEM.substring(0, 20) + "\n");
         
-        // Decode the Base64 encoded string into a byte array
+        // Decode the Base64-encoded String into a byte array to be passed to key spec
         byte[] publicKeyBytes = Base64.getDecoder().decode(publicKeyPEM);
                     
-        // Create a key specification for the public key
+        // Create a key specification for the public key (X509 seems to be the standard)
         EncodedKeySpec keySpec = new X509EncodedKeySpec(publicKeyBytes);
                         
-        // Create a key factory for the RSA algorithm (or "EC" for elliptic curve keys)
+        // Create a key factory for the RSA algorithm
         KeyFactory keyFactory = KeyFactory.getInstance("RSA");        
 
-        // Generate the PublicKey object
+        // Generate & return the PublicKey object
         return keyFactory.generatePublic(keySpec);
        
     }
 	
-	// Helper method to create configuration file to circumvent the GitHub secure settings, not ideal
+	// Helper method to create configuration file to circumvent the GitHub secure settings (not ideal)
 	public void createConfigFile(File sshDir) throws IOException {
 		this.configFile = new File(sshDir, "config");
 			

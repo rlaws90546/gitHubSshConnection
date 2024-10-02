@@ -147,5 +147,6 @@ public class GitService {
 		}
     }
     
+    // Used to allow App.java to call deleteConfigFile in SshService
     public final void deleteConfigFile() { this.sshService.deleteConfigFile(); }
 }
