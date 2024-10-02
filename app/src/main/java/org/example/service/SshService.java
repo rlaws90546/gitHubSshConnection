@@ -39,38 +39,6 @@ public class SshService {
 	private String pubKeyPath;
 	private KeyPair keyPair;
 	
-	@SuppressWarnings("unused")
-	public SshService() {
-		
-		// Configure the SshClient with default client identity
-        this.sshClient = SshClient.setUpDefaultClient();
-        this.sshClient.setClientIdentityLoader(ClientIdentityLoader.DEFAULT);
-        this.sshClient.start();
-
-        // Create a new SshdSessionFactory using the .ssh directory
-        File defaultSshDir = new File(FS.DETECTED.userHome(), "/.ssh");
-        this.sshdSessionFactory = new SshdSessionFactoryBuilder()
-                .setPreferredAuthentications("publickey")
-                .setHomeDirectory(FS.DETECTED.userHome())
-                .setSshDirectory(defaultSshDir)
-                .build(null);
-
-        // Ensure the session factory is not null before using it
-        if (this.sshdSessionFactory == null) {
-            throw new IllegalStateException("SSH session factory is null.");
-        } 
-        
-        // Configure the transport to use the custom SshdSessionFactory
-        this.transportConfigCallback = new TransportConfigCallback() {
-            @Override
-            public void configure(Transport transport) {
-                if (transport instanceof SshTransport) {
-                    ((SshTransport) transport).setSshSessionFactory(sshdSessionFactory);
-                }
-            }
-        };
-	}
-	
 	// Constructor for loading public/private key pair
 	@SuppressWarnings("unused")
 	public SshService(String publicKeyPath, String privateKeyPath) throws IOException{
