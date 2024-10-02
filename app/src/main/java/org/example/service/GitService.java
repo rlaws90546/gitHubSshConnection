@@ -73,10 +73,7 @@ public class GitService {
     	return false;
     }
     
-    // Helper methods to create SSH service
-    public void createSshService() {
-    	this.sshService = new SshService();
-    }
+    // Helper method to create SSH service
     public void createSshService(String pubKeyPath, String privKeyPath) {
     	try {
 			this.sshService = new SshService(pubKeyPath, privKeyPath);

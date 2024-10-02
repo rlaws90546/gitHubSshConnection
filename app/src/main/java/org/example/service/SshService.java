@@ -60,10 +60,12 @@ public class SshService {
 	    this.pubKeyPath = publicKeyPath;
 	    this.privKeyPath = privateKeyPath;
 	    
+	    createConfigFile(defaultSshDir);
+	    
 	    // IMPORTANT STUFF here: 
 	    //   --> Used the ".setDefaultKeysProvider(File -> Iterable<KeyPair>)" to pass converted keys to the SshdSession Factory
 	    //       (The Factory Builder still requires you to set the Home and SSH directories, which is why those are still there)
-	    this.sshdSessionFactory sshdSession = new SshdSessionFactoryBuilder()
+	    this.sshdSessionFactory = new SshdSessionFactoryBuilder()
                 .setPreferredAuthentications("publickey")
                 .setHomeDirectory(FS.DETECTED.userHome())
                 .setSshDirectory(defaultSshDir)
@@ -134,7 +136,7 @@ public class SshService {
             .replaceAll("\\s+", "");
         
         // Debugging print statement to verify that the private key is copying and being formatted correctly
-        //System.out.println("Formatted PrivKey: \n" + privateKeyPEM.substring(0, 100) + "\n");
+        System.out.println("Formatted PrivKey: \n" + privateKeyPEM.substring(0, 100) + "\n");
         
         // Decode the Base64-encoded String into a byte array to be passed to key spec
         byte[] privateKeyBytes = Base64.getDecoder().decode(privateKeyPEM);

@@ -12,7 +12,6 @@ public class App {
 		return "Hello World, I am a Gradle project...";
 	}
 	
-	
     public static void main(String[] args) {
 		
     	// Provide the path to public and private key PEM files (works best if they are put in the "app" directory)
