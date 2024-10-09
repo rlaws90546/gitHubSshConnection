@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.lang.Process;
 import java.lang.IllegalStateException;
+import java.security.GeneralSecurityException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,9 +75,9 @@ public class GitService {
     }
     
     // Helper method to create SSH service
-    public void createSshService(String pubKeyPath, String privKeyPath) {
+    public void createSshService(String pubKey, String privKey) throws GeneralSecurityException{
     	try {
-			this.sshService = new SshService(pubKeyPath, privKeyPath);
+			this.sshService = new SshService(pubKey, privKey);
 		} catch (IOException e) {
 			System.err.println("Error creating SSH service with private key path & private key loaded:\n");
 			e.printStackTrace();

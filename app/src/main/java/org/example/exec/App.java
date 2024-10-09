@@ -4,6 +4,19 @@
 package org.example;
 
 import org.example.service.GitService;
+import java.io.IOException;
+
+// Added these imports to start working on conversion from OpenSSH to PEM in Java (only RSA right now)
+import java.io.StringReader;
+import java.security.KeyFactory;
+import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.PKCS8EncodedKeySpec;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.openssl.PEMKeyPair;
+import org.bouncycastle.openssl.PEMParser;
+import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
 
 public class App {
 	
@@ -12,26 +25,30 @@ public class App {
 		return "Hello World, I am a Gradle project...";
 	}
 	
-    public static void main(String[] args) {
+public static void main(String[] args) throws Exception{
 		
-    	// Provide the path to public and private key PEM files (works best if they are put in the "app" directory)
+    	// Provide the public and private key PEM files
     	// TODO Change the paths below
-		String publicKeyPath = "pubkey_path.pem";
-		String privateKeyPath = "privkey_path.pem";
+		String publicKey = "-----BEGIN PUBLIC KEY-----\n"
+				+ "...\n"
+				+ "-----END PUBLIC KEY-----";
+		String privateKey = "-----BEGIN PRIVATE KEY-----\n"
+				+ "... \n"
+				+ "-----END PRIVATE KEY-----";
 		
 		
 		// Create Git Service object with the SSH address to the GitHub repo and the location of the repository on the local machine
-		GitService gitService = new GitService("git@github.com:userName/repoName.git", "/path/to/local/gitDir");
+		GitService gitService = new GitService("git@github.com:userName/repo_name.git", “/path/to/local/gitDir”);
 		
 		// Call method to create SSH connection with public and private keys 
-		gitService.createSshService(publicKeyPath, privateKeyPath);
+		gitService.createSshService(publicKey, privateKey);
 		
 		// Pick which method you would like to use from GitService --> cloneRepository() OR addCommitPush()
 		//gitService.cloneRepository();
 		gitService.addCommitPush();
 
 		// Call helper method to delete the configuration file for the SSH directory
-		// TODO do this behind the scenes...
+		// TODO do this behind the scenes maybe, config file is DEFINITELY required to push... not ideal
 		gitService.deleteConfigFile();
 		
 		// Before the end of the main method, close out of SSH service

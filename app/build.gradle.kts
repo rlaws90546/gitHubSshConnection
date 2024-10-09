@@ -45,6 +45,15 @@ dependencies {
 
     // JGit SSH Apache (repeat avoided)
     implementation("org.eclipse.jgit:org.eclipse.jgit.ssh.apache:6.7.0.202309050840-r")
+    
+    // https://mvnrepository.com/artifact/org.bouncycastle/bcprov-jdk18on
+	implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
+	
+	// https://mvnrepository.com/artifact/org.bouncycastle/bcpkix-jdk15on
+	implementation("org.bouncycastle:bcpkix-jdk15on:1.70")
+	
+
+    
 }
 
 // Apply a specific Java toolchain to ease working on different environments.

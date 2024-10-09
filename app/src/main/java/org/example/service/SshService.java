@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.function.Function;
 import java.util.Base64;
 import java.lang.IllegalStateException;
+import java.security.GeneralSecurityException;
 
 import org.apache.sshd.client.SshClient;
 import org.apache.sshd.client.config.keys.ClientIdentityLoader;
@@ -37,9 +38,6 @@ public class SshService {
 	private TransportConfigCallback transportConfigCallback;
 	private SshClient sshClient;
 	private SshdSessionFactory sshdSessionFactory = null;
-	private String privKeyPath;
-	private String pubKeyPath;
-	private KeyPair keyPair;
 	
 	// Global variables for configuration file helps getting around security (not great)
 	private File configFile;
@@ -49,16 +47,12 @@ public class SshService {
 	
 	// Constructor for loading public/private key pair (really .pem files that contain the keys, also why an IOException is thrown)
 	@SuppressWarnings("unused")
-	public SshService(String publicKeyPath, String privateKeyPath) throws IOException{
+	public SshService(String publicKey, String privateKey) throws IOException, GeneralSecurityException {
 		
 	    // Set up SSH client with default client identity
 	    this.sshClient = SshClient.setUpDefaultClient();
 	    this.sshClient.setClientIdentityLoader(ClientIdentityLoader.DEFAULT);
 	    this.sshClient.start();
-	    
-	    // Set global variables to file paths that were passed from GitService, so they can be used for access and converting to Java objects
-	    this.pubKeyPath = publicKeyPath;
-	    this.privKeyPath = privateKeyPath;
 	    
 	    createConfigFile(defaultSshDir);
 	    
@@ -69,7 +63,7 @@ public class SshService {
                 .setPreferredAuthentications("publickey")
                 .setHomeDirectory(FS.DETECTED.userHome())
                 .setSshDirectory(defaultSshDir)
-                .setDefaultKeysProvider(this::createKeyPairSafely)
+                .setDefaultKeysProvider(f -> createKeyPair(f, publicKey, privateKey))
                 .build(null);
 
 	    // Ensure the session factory is not null before using it
@@ -93,42 +87,21 @@ public class SshService {
 		return transportConfigCallback;
 	}
 	
-	// Ran into a few issues with unhandled Exceptions when trying to get the lambda/arrow function in the SshdSessionFactory to work properly,
-	//   so I ended up making this try/catch method to do it.
-	// TODO --> make this cleaner...
-	private Iterable<KeyPair> createKeyPairSafely(File f) {
-		Iterable<KeyPair> safePair = null;
+	// The helper method that returns the required Iterable<KeyPair> object after adding them to the Iterable
+	private Iterable<KeyPair> createKeyPair(File f, String publicKey, String privateKey) {		
 		try {
-	        safePair = createKeyPair(f);
-	    } catch (Exception e) {}
-	    if (safePair == null)
-	    	throw new IllegalStateException("Failed to create key pair");
-	    return safePair;
-	}
-	
-	// The real helper method that returns the required Iterable<KeyPair> object, calls collectKeysFromMemory() to add them to the Iterable
-	private Iterable<KeyPair> createKeyPair(File f) throws Exception{		
-		List<KeyPair> pair = new ArrayList<>();
-		collectKeyFromMemory();
-		pair.add(this.keyPair);
-		
-		return pair;
-	}
-	
-	// Helper method that just represents the logic of loading BOTH the Public & PrivateKey objects into the KeyPair object
-	private void collectKeyFromMemory() {
-		try {
-			this.keyPair = new KeyPair(loadPublicKey(this.pubKeyPath), loadPrivateKey(this.privKeyPath));
+			List<KeyPair> pair = new ArrayList<>();
+			pair.add(new KeyPair(loadPublicKey(publicKey), loadPrivateKey(privateKey)));
+			System.out.println("KeyPair object created\n");
+			return pair;
 		} catch (Exception e) {
-			System.err.println("Problem loading keys..." + e);
+			throw new IllegalStateException("Failed to create KeyPair object: ", e);
 		}
 	}
 	
 	// Method to take a PEM-formatted private key and convert it into a PrivateKey object
-	public static PrivateKey loadPrivateKey(String filename) throws Exception {
-        // Read the private key from the file
-        String privateKeyPEM = new String(Files.readAllBytes(Paths.get(filename)));
-        
+	private static PrivateKey loadPrivateKey(String privateKeyPEM) throws Exception {
+
         // Remove "BEGIN", "END", and whitespace from the key string
         privateKeyPEM = privateKeyPEM
             .replace("-----BEGIN PRIVATE KEY-----", "")
@@ -152,9 +125,7 @@ public class SshService {
         return keyFactory.generatePrivate(keySpec);
     }
 	
-	public static PublicKey loadPublicKey(String filename) throws Exception {
-        // Read the public key from the file
-		String publicKeyPEM = new String(Files.readAllBytes(Paths.get(filename)));
+	private static PublicKey loadPublicKey(String publicKeyPEM) throws Exception {
 		
 		// Remove "BEGIN", "END", and whitespace from the key string
         publicKeyPEM = publicKeyPEM
